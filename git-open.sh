@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 usage() {
   echo "Usage: $0 [user name] [repo name]"
@@ -30,9 +30,27 @@ parse_url() {
   repo="$project"
 }
 
+# separate function to parse CodeCommit URLs (e.g. codecommit::ap-southeast-2://profile@repo)
+parse_url_codecommit() {
+  local proto region url profile repo_name
+
+  proto="$(echo $1 | sed -e's,^\(.*://\).*,\1,g')"
+  url="$(echo ${1/$proto/})"
+  
+  region="$(echo $1 | cut -d ':' -f 3)"
+  profile="$(echo $url | grep @ | cut -d@ -f1)"
+  repo_name="$(echo ${url/$profile@/} | cut -d/ -f1)"
+
+  # update globals  
+  baseurl="https://${region}.console.aws.amazon.com/codesuite/codecommit"
+  username="repositories"
+  repo="${repo_name}/browse?region=${region}"
+}
+
 #parse_url git@github.com:glensc/git-open.git
 #parse_url https://github.com/jeffreyiacono/git-open
 #parse_url git@gitlab.com:gitlab-org/examples/mvn-example.git
+#parse_url_codecommit codecommit::ap-southeast-2://profile@repo
 
 git_repo=$(git rev-parse --git-dir 2>/dev/null)
 
@@ -52,6 +70,9 @@ fi
 
 if [ -z "$git_repo" ]; then
   baseurl=${GITHUB_URL:-"https://github.com"}
+elif [[ $(git config remote.origin.url) == codecommit::* ]]; then
+  # baseurl="https://ap-southeast-2.console.aws.amazon.com/codesuite/codecommit";username="repositories";repo="repo/browse?region=ap-southeast-2"
+  parse_url_codecommit "$(git config remote.origin.url)"
 else
   # baseurl="https://github.com";username="jeffreyiacono";repo="git-open"
   parse_url "$(git config remote.origin.url)"
